@@ -1,5 +1,8 @@
 ﻿@page "/cart"
 @inject ICartService CartService
+@inject IOrderService OrderService
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
 
 <PageTitle>Shopping Cart</PageTitle>
 <h3>Shopping Cart</h3>
@@ -34,14 +37,24 @@ else
             Total (@cartProducts.Count): £@cartProducts.Sum(product => product.Price * product.Quantity)
             </div>
     </div>
+    @if (isAuthenticated)
+    {
+        <div>
+            <h5>Delivery Address</h5>
+            <AddressForm />
+        </div>
+    }
+    <button @onclick="PlaceOrder" class="btn btn-success float-end mt-1">Checkout</button>
 }
 
 @code {
     List<CartProductResponseDto> cartProducts = null;
     string message = "Loading cart...";
+    bool isAuthenticated = false;
 
     protected override async Task OnInitializedAsync()
     {
+        isAuthenticated = await AuthService.IsUserAuthenticated();
         await LoadCart();
     }
 
@@ -53,14 +66,11 @@ else
 
     private async Task LoadCart()
     {
-        if ((await CartService.GetCartItems()).Count == 0)
+        await CartService.GetCartItemsCount();
+        cartProducts = await CartService.GetCartProducts();
+        if (cartProducts is null || cartProducts.Count == 0)
         {
             message = "Your cart is empty.";
-            cartProducts = new List<CartProductResponseDto>();
-        }
-        else
-        {
-            cartProducts = await CartService.GetCartProducts();
         }
     }
 
@@ -69,5 +79,11 @@ else
         product.Quantity = int.Parse(e.Value.ToString());
         if (product.Quantity < 1) product.Quantity = 1;
         await CartService.UpdateQuantity(product);
+    }
+
+    private async Task PlaceOrder()
+    {
+        string url = await OrderService.PlaceOrder();
+        NavigationManager.NavigateTo(url);
     }
 }
